@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多图上传系统</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .upload-section, .view-section {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            flex: 1;
+        }
+        
+        h1, h2 {
+            color: #333;
+            text-align: center;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .file-upload {
+            border: 2px dashed #ccc;
+            padding: 15px;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .file-upload:hover {
+            border-color: #4CAF50;
+        }
+        
+        input[type="date"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            width: 100%;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .preview-item {
+            position: relative;
+            width: 100px;
+            height: 100px;
+        }
+        
+        .preview-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        
+        .remove-preview {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: rgba(255, 0, 0, 0.7);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .submissions {
+            margin-top: 20px;
+        }
+        
+        .submission-item {
+            border-bottom: 1px solid #eee;
+            padding: 15px 0;
+        }
+        
+        .submission-date {
+            color: #666;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .submission-images {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .submission-image {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        
+        .delete-submission {
+            background-color: #f44336;
+            margin-top: 10px;
+        }
+        
+        .no-submissions {
+            text-align: center;
+            color: #888;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>多图上传系统</h1>
+    
+    <div class="container">
+        <div class="upload-section">
+            <h2>上传新内容</h2>
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label for="imageUpload">选择多张图片</label>
+                    <label class="file-upload" for="imageUpload">
+                        点击选择图片 (可多选JPG, PNG)
+                    </label>
+                    <input type="file" id="imageUpload" accept="image/*" multiple required>
+                    <div class="preview-container" id="previewContainer">
+                        <!-- 图片预览将在这里显示 -->
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="dateSelect">选择日期</label>
+                    <input type="date" id="dateSelect" required>
+                </div>
+                
+                <button type="submit">提交</button>
+            </form>
+        </div>
+        
+        <div class="view-section">
+            <h2>已提交内容</h2>
+            <div class="submissions" id="submissionsList">
+                <!-- 提交的内容将在这里显示 -->
+                <div class="no-submissions">暂无提交内容</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 存储的键名
+        const STORAGE_KEY = 'multiImageSubmissions';
+        
+        // DOM元素
+        const uploadForm = document.getElementById('uploadForm');
+        const imageUpload = document.getElementById('imageUpload');
+        const previewContainer = document.getElementById('previewContainer');
+        const dateSelect = document.getElementById('dateSelect');
+        const submissionsList = document.getElementById('submissionsList');
+        
+        // 存储当前选择的文件
+        let currentFiles = [];
+        
+        // 初始化 - 加载已保存的提交
+        document.addEventListener('DOMContentLoaded', loadSubmissions);
+        
+        // 多图选择和预览
+        imageUpload.addEventListener('change', function(e) {
+            currentFiles = Array.from(e.target.files);
+            previewContainer.innerHTML = '';
+            
+            if (currentFiles.length === 0) return;
+            
+            currentFiles.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const previewItem = document.createElement('div');
+                    previewItem.className = 'preview-item';
+                    
+                    const img = document.createElement('img');
+                    img.className = 'preview-image';
+                    img.src = event.target.result;
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'remove-preview';
+                    removeBtn.innerHTML = '×';
+                    removeBtn.onclick = () => removePreview(index);
+                    
+                    previewItem.appendChild(img);
+                    previewItem.appendChild(removeBtn);
+                    previewContainer.appendChild(previewItem);
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+        
+        // 移除预览图片
+        function removePreview(index) {
+            currentFiles.splice(index, 1);
+            imageUpload.value = ''; // 清空input以便重新选择
+            
+            // 重新渲染预览
+            const event = new Event('change');
+            imageUpload.dispatchEvent(event);
+        }
+        
+        // 表单提交
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const date = dateSelect.value;
+            
+            if (currentFiles.length === 0 || !date) {
+                alert('请至少选择一张图片并设置日期');
+                return;
+            }
+            
+            // 读取所有图片为DataURL
+            const imagePromises = currentFiles.map(file => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => resolve(event.target.result);
+                    reader.readAsDataURL(file);
+                });
+            });
+            
+            Promise.all(imagePromises).then(imageDataArray => {
+                const submission = {
+                    images: imageDataArray,
+                    date: date,
+                    timestamp: new Date().getTime()
+                };
+                
+                // 保存到localStorage
+                saveSubmission(submission);
+                
+                // 重新加载显示
+                loadSubmissions();
+                
+                // 重置表单
+                uploadForm.reset();
+                previewContainer.innerHTML = '';
+                currentFiles = [];
+                
+                alert(`提交成功！共上传了${imageDataArray.length}张图片`);
+            });
+        });
+        
+        // 保存提交到localStorage
+        function saveSubmission(submission) {
+            let submissions = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+            submissions.push(submission);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(submissions));
+        }
+        
+        // 从localStorage加载并显示提交
+        function loadSubmissions() {
+            const submissions = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+            
+            if (submissions.length === 0) {
+                submissionsList.innerHTML = '<div class="no-submissions">暂无提交内容</div>';
+                return;
+            }
+            
+            // 按时间倒序排序
+            submissions.sort((a, b) => b.timestamp - a.timestamp);
+            
+            let html = '';
+            submissions.forEach((sub, index) => {
+                html += `
+                    <div class="submission-item">
+                        <div class="submission-date">${formatDate(sub.date)} (${sub.images.length}张图片)</div>
+                        <div class="submission-images">
+                            ${sub.images.map(img => `
+                                < img src="${img}" class="submission-image" alt="提交的图片">
+                            `).join('')}
+                        </div>
+                        <button class="delete-submission" onclick="deleteSubmission(${index})">删除此提交</button>
+                    </div>
+                `;
+            });
+            
+            submissionsList.innerHTML = html;
+        }
+        
+        // 格式化日期显示
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('zh-CN', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+        
+        // 删除提交
+        window.deleteSubmission = function(index) {
+            if (confirm('确定要删除这个提交吗？')) {
+                let submissions = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+                submissions.splice(index, 1);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(submissions));
+                loadSubmissions();
+            }
+        };
+    </script>
+</body>
+</html>
